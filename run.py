@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from gradio_ui import demo
 from utils import handle_conversation
 import config
+from logger import values_bot_logger
 
 app = FastAPI()
 
@@ -26,23 +27,32 @@ def home():
 class ValuesChatRequest(BaseModel):
     query: str
     chat_history: list[list]
+    thread_id: str | None
 
 
 @app.post('/values/chat')
 def values_chat(values_chat_request: ValuesChatRequest):
     query = values_chat_request.query
     chat_history = values_chat_request.chat_history
+    thread_id = values_chat_request.thread_id
+    values_bot_logger.info('New request came...')
+    values_bot_logger.info(values_chat_request)
     try:
-        response = handle_conversation(chat_history, query, False)
-        print(response)
+        response, thread_id = handle_conversation(
+            chat_history, query, False, thread_id)
+        values_bot_logger.info(response)
+        values_bot_logger.info(thread_id)
         return {
             'status': 1,
-            'response': response
+            'response': response,
+            'thread_id': thread_id
         }
-    except:
+    except Exception as e:
+        values_bot_logger.exception(e)
         return {
             'status': 0,
-            'response': config.ERROR_MESSAGE
+            'response': config.ERROR_MESSAGE,
+            'thread_id': ''
         }
 
 

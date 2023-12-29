@@ -1,35 +1,33 @@
 import time
 import re
 
-from openai import OpenAI
-
 import config
+from logger import values_bot_logger
 
 
-client = OpenAI(
-    api_key=config.OPENAI_API_KEY
-)
+def handle_conversation(chat_history: list, query: str = None, isUI: bool = True, thread_id: str = '') -> list[list]:
 
-thread = client.beta.threads.create()
+    if thread_id == '':
+        thread = config.client.beta.threads.create()
+    else:
+        thread = config.client.beta.threads.retrieve(thread_id=thread_id)
 
-
-def handle_conversation(chat_history: list, query: str = None, isUI: bool = True) -> list[list]:
     if query == None:
         query = chat_history[-1][0]
 
-    client.beta.threads.messages.create(
+    config.client.beta.threads.messages.create(
         thread_id=thread.id,
         role='user',
         content=query
     )
-    run = client.beta.threads.runs.create(
+    run = config.client.beta.threads.runs.create(
         thread_id=thread.id,
         assistant_id=config.ASSISTANT_ID
     )
 
     flag = False
     while not flag:
-        retrieved_run = client.beta.threads.runs.retrieve(
+        retrieved_run = config.client.beta.threads.runs.retrieve(
             thread_id=thread.id,
             run_id=run.id
         )
@@ -38,17 +36,19 @@ def handle_conversation(chat_history: list, query: str = None, isUI: bool = True
         else:
             time.sleep(1.0)
 
-    thread_messages = client.beta.threads.messages.list(thread.id)
+    thread_messages = config.client.beta.threads.messages.list(thread.id)
 
     response = thread_messages.data[0].content[0].text.value
 
     response = re.sub(r"【\d+†source】", "", response)
 
+    values_bot_logger.info(f'Response -> {response}')
+
     if isUI:
         chat_history[-1][1] = response
         return chat_history
     else:
-        return response
+        return response, thread.id
 
 
 def handle_user_query(message: str, chat_history: list[tuple]) -> tuple:
